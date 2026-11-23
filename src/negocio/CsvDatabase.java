@@ -5,6 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.Scanner;
 import modelo.Lectura;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.util.Scanner;
+import modelo.Lectura;
 import modelo.Sensor;
 import modelo.Terreno;
 
@@ -29,13 +35,16 @@ public class CsvDatabase {
         }
 
         while (lector.hasNextLine()) {
-            String linea = lector.nextLine();
+            String linea = lector.nextLine().trim();
+            if (linea.isEmpty()) {
+                continue;
+            }
             String[] partes = linea.split(",");
             if (partes.length == 4) {
-                String id = partes[0];
-                String fecha = partes[1];
-                double humedad = Double.parseDouble(partes[2]);
-                String idSensor = partes[3];
+                String id = partes[0].trim();
+                String fecha = partes[1].trim();
+                double humedad = Double.parseDouble(partes[2].trim());
+                String idSensor = partes[3].trim();
 
                 Sensor sensor = terreno.buscarSensor(idSensor);
                 if (sensor == null) {
@@ -58,11 +67,9 @@ public class CsvDatabase {
         }
 
         escritor.println("id,date,humidityLevel,sensorId");
-        Sensor[] sensores = terreno.getSensores();
-        for (int i = 0; i < sensores.length; i++) {
-            Lectura[] lecturas = sensores[i].getLecturas();
-            for (int j = 0; j < lecturas.length; j++) {
-                escritor.println(lecturas[j].toCsvLine(sensores[i].getIdSensor()));
+        for (Sensor sensor : terreno.getSensores()) {
+            for (Lectura lectura : sensor.getLecturas()) {
+                escritor.println(lectura.toCsvLine(sensor.getIdSensor()));
             }
         }
         escritor.close();
@@ -71,13 +78,14 @@ public class CsvDatabase {
 
     public String generarSiguienteId(Terreno terreno) {
         int mayor = 0;
-        Sensor[] sensores = terreno.getSensores();
-        for (int i = 0; i < sensores.length; i++) {
-            Lectura[] lecturas = sensores[i].getLecturas();
-            for (int j = 0; j < lecturas.length; j++) {
-                int numero = Integer.parseInt(lecturas[j].getId().substring(4));
-                if (numero > mayor) {
-                    mayor = numero;
+        for (Sensor sensor : terreno.getSensores()) {
+            for (Lectura lectura : sensor.getLecturas()) {
+                String id = lectura.getId();
+                if (id.startsWith("REC-")) {
+                    int numero = Integer.parseInt(id.substring(4));
+                    if (numero > mayor) {
+                        mayor = numero;
+                    }
                 }
             }
         }

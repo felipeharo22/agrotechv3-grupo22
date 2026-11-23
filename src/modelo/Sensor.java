@@ -1,5 +1,8 @@
 package modelo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Sensor {
 
     private String idSensor;
@@ -7,8 +10,7 @@ public class Sensor {
     private double vSeco;
     private double vSat;
     private boolean estado;
-    private Lectura[] lecturas;
-    private int cantidadLecturas;
+    private List<Lectura> lecturas;
 
     public Sensor(String idSensor, String parcela, double vSeco, double vSat) {
         this.idSensor = idSensor;
@@ -16,8 +18,7 @@ public class Sensor {
         this.vSeco = vSeco;
         this.vSat = vSat;
         this.estado = true;
-        this.lecturas = new Lectura[50];
-        this.cantidadLecturas = 0;
+        this.lecturas = new ArrayList<>();
     }
 
     public boolean calibrar(double nuevoVSeco, double nuevoVSat) {
@@ -37,68 +38,58 @@ public class Sensor {
         if (lectura.getNivelHumedad() < 0.0 || lectura.getNivelHumedad() > 100.0) {
             return false;
         }
-        if (this.cantidadLecturas >= this.lecturas.length) {
-            expandirArreglo();
-        }
-        this.lecturas[this.cantidadLecturas++] = lectura;
-        return true;
+        return this.lecturas.add(lectura);
     }
 
     public boolean eliminarLecturaPorId(String idLectura) {
-        int indice = -1;
-        for (int i = 0; i < this.cantidadLecturas; i++) {
-            if (this.lecturas[i].getId().equalsIgnoreCase(idLectura)) {
-                indice = i;
-                break;
+        for (int i = 0; i < this.lecturas.size(); i++) {
+            if (this.lecturas.get(i).getId().equalsIgnoreCase(idLectura)) {
+                this.lecturas.remove(i);
+                return true;
             }
         }
-        if (indice == -1) {
-            return false;
-        }
-        for (int i = indice; i < this.cantidadLecturas - 1; i++) {
-            this.lecturas[i] = this.lecturas[i + 1];
-        }
-        this.lecturas[--this.cantidadLecturas] = null;
-        return true;
+        return false;
     }
 
     public Lectura buscarLecturaPorId(String idLectura) {
-        for (int i = 0; i < this.cantidadLecturas; i++) {
-            if (this.lecturas[i].getId().equalsIgnoreCase(idLectura)) {
-                return this.lecturas[i];
+        for (Lectura lectura : this.lecturas) {
+            if (lectura.getId().equalsIgnoreCase(idLectura)) {
+                return lectura;
             }
         }
         return null;
     }
 
     public double calcularPromedio() {
-        if (this.cantidadLecturas == 0) {
+        if (this.lecturas.isEmpty()) {
             return 0.0;
         }
         double suma = 0.0;
-        for (int i = 0; i < this.cantidadLecturas; i++) {
-            suma += this.lecturas[i].getNivelHumedad();
+        for (Lectura lectura : this.lecturas) {
+            suma += lectura.getNivelHumedad();
         }
-        return suma / this.cantidadLecturas;
+        return suma / this.lecturas.size();
     }
 
     public double calcularPendienteTendencia() {
-        if (this.cantidadLecturas < 2) {
+        int cantidad = this.lecturas.size();
+        if (cantidad < 2) {
             return 0.0;
         }
-        double primera = this.lecturas[0].getNivelHumedad();
-        double ultima = this.lecturas[this.cantidadLecturas - 1].getNivelHumedad();
-        return (ultima - primera) / (this.cantidadLecturas - 1);
+        double primera = this.lecturas.get(0).getNivelHumedad();
+        double ultima = this.lecturas.get(cantidad - 1).getNivelHumedad();
+        return (ultima - primera) / (cantidad - 1);
     }
 
     public double predecirSiguienteHumedad() {
-        if (this.cantidadLecturas == 0) {
+        int cantidad = this.lecturas.size();
+        if (cantidad == 0) {
             return 50.0;
         }
-        if (this.cantidadLecturas == 1) {
-            return this.lecturas[0].getNivelHumedad();
+        if (cantidad == 1) {
+            return this.lecturas.get(0).getNivelHumedad();
         }
-        double ultima = this.lecturas[this.cantidadLecturas - 1].getNivelHumedad();
+        double ultima = this.lecturas.get(cantidad - 1).getNivelHumedad();
         double prediccion = ultima + calcularPendienteTendencia();
         if (prediccion < 0.0) {
             return 0.0;
@@ -108,27 +99,15 @@ public class Sensor {
         return prediccion;
     }
 
-    private void expandirArreglo() {
-        Lectura[] nuevo = new Lectura[this.lecturas.length * 2];
-        for (int i = 0; i < this.cantidadLecturas; i++) {
-            nuevo[i] = this.lecturas[i];
-        }
-        this.lecturas = nuevo;
-    }
-
-    public Lectura[] getLecturas() {
-        Lectura[] copia = new Lectura[this.cantidadLecturas];
-        for (int i = 0; i < this.cantidadLecturas; i++) {
-            copia[i] = this.lecturas[i];
-        }
-        return copia;
+    public List<Lectura> getLecturas() {
+        return this.lecturas;
     }
 
     public Lectura getUltimaLectura() {
-        if (this.cantidadLecturas == 0) {
+        if (this.lecturas.isEmpty()) {
             return null;
         }
-        return this.lecturas[this.cantidadLecturas - 1];
+        return this.lecturas.get(this.lecturas.size() - 1);
     }
 
     public String getIdSensor() {
@@ -145,6 +124,6 @@ public class Sensor {
 
     public String mostrarInformacion() {
         return String.format("Sensor: %s | Parcela: %s | Lecturas: %d | Promedio: %.2f%%",
-                this.idSensor, this.parcela, this.cantidadLecturas, calcularPromedio());
+                this.idSensor, this.parcela, this.lecturas.size(), calcularPromedio());
     }
 }

@@ -1,5 +1,8 @@
 package modelo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Agronomo {
 
     private int id;
@@ -7,6 +10,7 @@ public class Agronomo {
     private String correo;
     private String contrasenia;
     private int intentosFallidos;
+    private List<Terreno> terrenos;
 
     public Agronomo(int id, String nombre, String correo, String contrasenia) {
         this.id = id;
@@ -14,6 +18,23 @@ public class Agronomo {
         this.correo = correo;
         this.contrasenia = contrasenia;
         this.intentosFallidos = 0;
+        this.terrenos = new ArrayList<>();
+    }
+
+    public boolean agregarTerreno(Terreno terreno) {
+        if (terreno == null || buscarTerreno(terreno.getCodigo()) != null) {
+            return false;
+        }
+        return this.terrenos.add(terreno);
+    }
+
+    public Terreno buscarTerreno(String codigo) {
+        for (Terreno terreno : this.terrenos) {
+            if (terreno.getCodigo().equalsIgnoreCase(codigo)) {
+                return terreno;
+            }
+        }
+        return null;
     }
 
     public boolean estaBloqueado() {
@@ -45,8 +66,12 @@ public class Agronomo {
         return this.intentosFallidos;
     }
 
+    public List<Terreno> getTerrenos() {
+        return this.terrenos;
+    }
+
     public String mostrarInformacion() {
-        return String.format("Agrónomo #%d: %s (%s) | Bloqueado: %s",
-                this.id, this.nombre, this.correo, estaBloqueado() ? "SÍ" : "NO");
+        return String.format("Agrónomo #%d: %s (%s) | Terrenos: %d | Bloqueado: %s",
+                this.id, this.nombre, this.correo, this.terrenos.size(), estaBloqueado() ? "SÍ" : "NO");
     }
 }

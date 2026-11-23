@@ -1,5 +1,7 @@
 package modelo;
 
+import java.util.ArrayList;
+import java.util.List;
 
 public class Terreno {
 
@@ -8,8 +10,7 @@ public class Terreno {
     private double areaHectareas;
     private double umbralSeco;
     private double umbralExceso;
-    private Sensor[] sensores;
-    private int cantidadSensores;
+    private List<Sensor> sensores;
 
     public Terreno(String codigo, String tipoTierra, double areaHectareas, double umbralSeco, double umbralExceso) {
         this.codigo = codigo;
@@ -17,29 +18,20 @@ public class Terreno {
         this.areaHectareas = areaHectareas;
         this.umbralSeco = umbralSeco;
         this.umbralExceso = umbralExceso;
-        this.sensores = new Sensor[20];
-        this.cantidadSensores = 0;
+        this.sensores = new ArrayList<>();
     }
 
     public boolean agregarSensor(Sensor sensor) {
         if (sensor == null || buscarSensor(sensor.getIdSensor()) != null) {
             return false;
         }
-        if (this.cantidadSensores >= this.sensores.length) {
-            Sensor[] nuevo = new Sensor[this.sensores.length * 2];
-            for (int i = 0; i < this.cantidadSensores; i++) {
-                nuevo[i] = this.sensores[i];
-            }
-            this.sensores = nuevo;
-        }
-        this.sensores[this.cantidadSensores++] = sensor;
-        return true;
+        return this.sensores.add(sensor);
     }
 
     public Sensor buscarSensor(String idSensor) {
-        for (int i = 0; i < this.cantidadSensores; i++) {
-            if (this.sensores[i].getIdSensor().equalsIgnoreCase(idSensor)) {
-                return this.sensores[i];
+        for (Sensor sensor : this.sensores) {
+            if (sensor.getIdSensor().equalsIgnoreCase(idSensor)) {
+                return sensor;
             }
         }
         return null;
@@ -80,16 +72,16 @@ public class Terreno {
         }
     }
 
-    public Sensor[] getSensores() {
-        Sensor[] copia = new Sensor[this.cantidadSensores];
-        for (int i = 0; i < this.cantidadSensores; i++) {
-            copia[i] = this.sensores[i];
-        }
-        return copia;
+    public String getCodigo() {
+        return this.codigo;
+    }
+
+    public List<Sensor> getSensores() {
+        return this.sensores;
     }
 
     public String mostrarInformacion() {
         return String.format("Terreno: %s | Tierra: %s | Área: %.1f ha | Umbrales: [%.1f%% - %.1f%%] | Sensores: %d",
-                this.codigo, this.tipoTierra, this.areaHectareas, this.umbralSeco, this.umbralExceso, this.cantidadSensores);
+                this.codigo, this.tipoTierra, this.areaHectareas, this.umbralSeco, this.umbralExceso, this.sensores.size());
     }
 }

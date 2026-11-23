@@ -1,5 +1,6 @@
 package interfaz;
 
+import java.util.List;
 import java.util.Scanner;
 import modelo.AccionAgronomica;
 import modelo.Agronomo;
@@ -76,6 +77,7 @@ public class ConsolaMenu {
 
             if (this.agronomo.autenticar(pass)) {
                 System.out.println(">> Acceso concedido. Bienvenido, " + this.agronomo.getNombre() + "!");
+                System.out.println(">> " + this.agronomo.mostrarInformacion());
                 System.out.println(">> " + this.terreno.mostrarInformacion());
                 System.out.println();
                 return true;
@@ -111,8 +113,8 @@ public class ConsolaMenu {
     }
 
     private void handleListAllReadings() {
-        Sensor[] sensores = this.terreno.getSensores();
-        if (sensores.length == 0) {
+        List<Sensor> sensores = this.terreno.getSensores();
+        if (sensores.isEmpty()) {
             System.out.println(">> No hay sensores ni lecturas registradas en el archivo CSV.");
             return;
         }
@@ -121,11 +123,8 @@ public class ConsolaMenu {
         System.out.println("======================== REGISTROS EN BASE CSV ========================");
         System.out.printf("%-10s %-18s %-15s %-12s%n", "ID Reg.", "Fecha / Hora", "Humedad (%)", "ID Sensor");
         System.out.println("-----------------------------------------------------------------------");
-        for (int i = 0; i < sensores.length; i++) {
-            Sensor s = sensores[i];
-            Lectura[] lecturas = s.getLecturas();
-            for (int j = 0; j < lecturas.length; j++) {
-                Lectura l = lecturas[j];
+        for (Sensor s : sensores) {
+            for (Lectura l : s.getLecturas()) {
                 System.out.printf("%-10s %-18s %-15.2f %-12s%n",
                         l.getId(), l.getFecha(), l.getNivelHumedad(), s.getIdSensor());
                 total++;
@@ -174,11 +173,9 @@ public class ConsolaMenu {
         System.out.print("Ingrese ID de Lectura a modificar (ej. REC-001): ");
         String id = this.scanner.nextLine().trim();
 
-        Sensor[] sensores = this.terreno.getSensores();
         Lectura encontrada = null;
-
-        for (int i = 0; i < sensores.length; i++) {
-            encontrada = sensores[i].buscarLecturaPorId(id);
+        for (Sensor s : this.terreno.getSensores()) {
+            encontrada = s.buscarLecturaPorId(id);
             if (encontrada != null) {
                 break;
             }
@@ -205,11 +202,9 @@ public class ConsolaMenu {
         System.out.print("Ingrese ID de Lectura a eliminar: ");
         String id = this.scanner.nextLine().trim();
 
-        Sensor[] sensores = this.terreno.getSensores();
         boolean eliminado = false;
-
-        for (int i = 0; i < sensores.length; i++) {
-            if (sensores[i].eliminarLecturaPorId(id)) {
+        for (Sensor s : this.terreno.getSensores()) {
+            if (s.eliminarLecturaPorId(id)) {
                 eliminado = true;
                 break;
             }
@@ -223,15 +218,15 @@ public class ConsolaMenu {
     }
 
     private void handleAnalyzeSensor() {
-        Sensor[] sensores = this.terreno.getSensores();
-        if (sensores.length == 0) {
+        List<Sensor> sensores = this.terreno.getSensores();
+        if (sensores.isEmpty()) {
             System.out.println(">> No hay sensores registrados en el terreno.");
             return;
         }
 
         System.out.print("Sensores disponibles: ");
-        for (int i = 0; i < sensores.length; i++) {
-            System.out.printf("[%s] ", sensores[i].getIdSensor());
+        for (Sensor s : sensores) {
+            System.out.printf("[%s] ", s.getIdSensor());
         }
         System.out.println();
 
@@ -253,7 +248,7 @@ public class ConsolaMenu {
 
         System.out.println("==================== REPORTE DE ANÁLISIS DE SENSOR ====================");
         System.out.printf(" Sensor:               %s (%s)%n", sensor.getIdSensor(), sensor.getParcela());
-        System.out.printf(" Total Lecturas:       %d registros%n", sensor.getLecturas().length);
+        System.out.printf(" Total Lecturas:       %d registros%n", sensor.getLecturas().size());
         System.out.printf(" Última Fecha/Hora:    %s%n", latest.getFecha());
         System.out.printf(" Humedad Actual:       %.2f%%%n", latest.getNivelHumedad());
         System.out.printf(" Estado del Suelo:     [%s]%n", state);
@@ -268,8 +263,8 @@ public class ConsolaMenu {
     }
 
     private void handleSummaryReport() {
-        Sensor[] sensores = this.terreno.getSensores();
-        if (sensores.length == 0) {
+        List<Sensor> sensores = this.terreno.getSensores();
+        if (sensores.isEmpty()) {
             System.out.println(">> No hay sensores registrados en el terreno.");
             return;
         }
@@ -281,8 +276,7 @@ public class ConsolaMenu {
                 "ID Sensor", "Lecturas", "Actual (%)", "Estado", "Tendencia", "Predicción", "Prioridad");
         System.out.println("-------------------------------------------------------------------------------");
 
-        for (int i = 0; i < sensores.length; i++) {
-            Sensor s = sensores[i];
+        for (Sensor s : sensores) {
             Lectura latest = s.getUltimaLectura();
             if (latest == null) {
                 continue;
@@ -293,7 +287,7 @@ public class ConsolaMenu {
             AccionAgronomica accion = this.terreno.evaluarTerreno(s.getIdSensor());
 
             System.out.printf("%-14s %-9d %-12.2f %-10s %-12.3f %-12.2f %-12s%n",
-                    s.getIdSensor(), s.getLecturas().length, latest.getNivelHumedad(),
+                    s.getIdSensor(), s.getLecturas().size(), latest.getNivelHumedad(),
                     state, slope, forecast, accion.getPrioridad());
         }
         System.out.println("===============================================================================");
