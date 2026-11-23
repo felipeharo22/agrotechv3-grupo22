@@ -5,12 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.Scanner;
 import modelo.Lectura;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
-import java.util.Scanner;
-import modelo.Lectura;
 import modelo.Sensor;
 import modelo.Terreno;
 

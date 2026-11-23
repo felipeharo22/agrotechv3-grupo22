@@ -1,4 +1,5 @@
 import interfaz.ConsolaMenu;
+import interfaz.Validador;
 import java.util.Scanner;
 import modelo.Agronomo;
 import modelo.Terreno;
@@ -10,30 +11,24 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("--- DATOS DEL TERRENO ---");
-        System.out.print("Código del terreno: ");
-        String codigo = scanner.nextLine();
-        System.out.print("Tipo de tierra: ");
-        String tipoTierra = scanner.nextLine();
-        System.out.print("Área en hectáreas (ej. 12.5): ");
-        double area = Double.parseDouble(scanner.nextLine());
-        System.out.print("Umbral seco (%) (ej. 40): ");
-        double umbralSeco = Double.parseDouble(scanner.nextLine());
-        System.out.print("Umbral de exceso (%) (ej. 80): ");
-        double umbralExceso = Double.parseDouble(scanner.nextLine());
+        String codigo = Validador.leerTexto(scanner, "Código del terreno: ");
+        System.out.println("Tipos de suelo:");
+        System.out.println(" 1. Arenoso");
+        System.out.println(" 2. Arcilloso");
+        System.out.println(" 3. Humífero");
+        System.out.println(" 4. Rocoso");
+        int tipoSuelo = Validador.leerEntero(scanner, "Seleccione el tipo de suelo (1-4): ", 1, 4);
+        double area = Validador.leerDecimal(scanner, "Área en hectáreas (ej. 12.5): ", 0.1, 100000);
 
         System.out.println();
         System.out.println("--- DATOS DEL AGRÓNOMO ---");
-        System.out.print("ID del agrónomo (número): ");
-        int id = Integer.parseInt(scanner.nextLine());
-        System.out.print("Nombre: ");
-        String nombre = scanner.nextLine();
-        System.out.print("Correo: ");
-        String correo = scanner.nextLine();
-        System.out.print("Contraseña: ");
-        String contrasenia = scanner.nextLine();
+        int id = Validador.leerEntero(scanner, "ID del agrónomo (número): ", 1, 99999);
+        String nombre = Validador.leerNombre(scanner, "Nombre: ");
+        String correo = Validador.leerCorreo(scanner, "Correo: ");
+        String contrasenia = Validador.leerTexto(scanner, "Contraseña: ");
         System.out.println();
 
-        Terreno terreno = new Terreno(codigo, tipoTierra, area, umbralSeco, umbralExceso);
+        Terreno terreno = new Terreno(codigo, tipoSuelo, area);
         Agronomo agronomo = new Agronomo(id, nombre, correo, contrasenia);
         CsvDatabase database = new CsvDatabase("data/readings.csv");
 

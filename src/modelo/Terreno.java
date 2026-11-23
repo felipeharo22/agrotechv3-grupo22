@@ -12,13 +12,33 @@ public class Terreno {
     private double umbralExceso;
     private List<Sensor> sensores;
 
-    public Terreno(String codigo, String tipoTierra, double areaHectareas, double umbralSeco, double umbralExceso) {
+    public Terreno(String codigo, int tipoSuelo, double areaHectareas) {
         this.codigo = codigo;
-        this.tipoTierra = tipoTierra;
         this.areaHectareas = areaHectareas;
-        this.umbralSeco = umbralSeco;
-        this.umbralExceso = umbralExceso;
         this.sensores = new ArrayList<>();
+
+        switch (tipoSuelo) {
+            case 1:
+                this.tipoTierra = "Arenoso";
+                this.umbralSeco = 25.0;
+                this.umbralExceso = 60.0;
+                break;
+            case 2:
+                this.tipoTierra = "Arcilloso";
+                this.umbralSeco = 45.0;
+                this.umbralExceso = 85.0;
+                break;
+            case 3:
+                this.tipoTierra = "Humífero";
+                this.umbralSeco = 40.0;
+                this.umbralExceso = 80.0;
+                break;
+            default:
+                this.tipoTierra = "Rocoso";
+                this.umbralSeco = 20.0;
+                this.umbralExceso = 55.0;
+                break;
+        }
     }
 
     public boolean agregarSensor(Sensor sensor) {

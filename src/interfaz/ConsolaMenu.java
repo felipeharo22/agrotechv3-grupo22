@@ -33,7 +33,7 @@ public class ConsolaMenu {
         boolean running = true;
         while (running) {
             printMenuOptions();
-            int choice = readIntOption("Seleccione una opción: ", 0, 6);
+            int choice = Validador.leerEntero(this.scanner, "Seleccione una opción: ", 0, 6);
             System.out.println();
 
             switch (choice) {
@@ -72,8 +72,7 @@ public class ConsolaMenu {
         System.out.println("Usuario registrado: " + this.agronomo.getNombre() + " (" + this.agronomo.getCorreo() + ")");
 
         while (!this.agronomo.estaBloqueado()) {
-            System.out.print("Ingrese contraseña (por defecto 'palma2026'): ");
-            String pass = this.scanner.nextLine().trim();
+            String pass = Validador.leerTexto(this.scanner, "Ingrese contraseña: ");
 
             if (this.agronomo.autenticar(pass)) {
                 System.out.println(">> Acceso concedido. Bienvenido, " + this.agronomo.getNombre() + "!");
@@ -140,19 +139,9 @@ public class ConsolaMenu {
         String newId = this.database.generarSiguienteId(this.terreno);
         System.out.printf("ID de Lectura generado: %s%n", newId);
 
-        System.out.print("Ingrese Fecha/Hora (ej. 2026-11-01 08:30): ");
-        String date = this.scanner.nextLine().trim();
-        if (date.isEmpty()) {
-            date = "2026-11-01 08:00";
-        }
-
-        double humidity = readDoubleOption("Ingrese Nivel de Humedad (%): ", 0.0, 100.0);
-
-        System.out.print("Ingrese ID del Sensor (ej. SEN-PALM-01): ");
-        String sensorId = this.scanner.nextLine().trim().toUpperCase();
-        if (sensorId.isEmpty()) {
-            sensorId = "SEN-PALM-01";
-        }
+        String date = Validador.leerFecha(this.scanner, "Ingrese Fecha/Hora (ej. 2026-11-01 08:30): ");
+        double humidity = Validador.leerDecimal(this.scanner, "Ingrese Nivel de Humedad (%): ", 0.0, 100.0);
+        String sensorId = Validador.leerTexto(this.scanner, "Ingrese ID del Sensor (ej. SEN-PALM-01): ").toUpperCase();
 
         Sensor sensor = this.terreno.buscarSensor(sensorId);
         if (sensor == null) {
@@ -170,8 +159,7 @@ public class ConsolaMenu {
 
     private void handleEditReading() {
         System.out.println("--- EDITAR LECTURA EN EL TERRENO ---");
-        System.out.print("Ingrese ID de Lectura a modificar (ej. REC-001): ");
-        String id = this.scanner.nextLine().trim();
+        String id = Validador.leerTexto(this.scanner, "Ingrese ID de Lectura a modificar (ej. REC-001): ");
 
         Lectura encontrada = null;
         for (Sensor s : this.terreno.getSensores()) {
@@ -187,7 +175,7 @@ public class ConsolaMenu {
         }
 
         System.out.println("Registro actual: " + encontrada.mostrarInformacion());
-        double newHumidity = readDoubleOption("Ingrese Nuevo Nivel de Humedad (%): ", 0.0, 100.0);
+        double newHumidity = Validador.leerDecimal(this.scanner, "Ingrese Nuevo Nivel de Humedad (%): ", 0.0, 100.0);
 
         encontrada.setNivelHumedad(newHumidity);
         if (this.database.guardarTerrenoEnCsv(this.terreno)) {
@@ -199,8 +187,7 @@ public class ConsolaMenu {
 
     private void handleDeleteReading() {
         System.out.println("--- ELIMINAR LECTURA DEL TERRENO ---");
-        System.out.print("Ingrese ID de Lectura a eliminar: ");
-        String id = this.scanner.nextLine().trim();
+        String id = Validador.leerTexto(this.scanner, "Ingrese ID de Lectura a eliminar: ");
 
         boolean eliminado = false;
         for (Sensor s : this.terreno.getSensores()) {
@@ -230,8 +217,7 @@ public class ConsolaMenu {
         }
         System.out.println();
 
-        System.out.print("Ingrese ID del Sensor a analizar: ");
-        String sensorId = this.scanner.nextLine().trim().toUpperCase();
+        String sensorId = Validador.leerTexto(this.scanner, "Ingrese ID del Sensor a analizar: ").toUpperCase();
 
         Sensor sensor = this.terreno.buscarSensor(sensorId);
         if (sensor == null || sensor.getUltimaLectura() == null) {
@@ -291,37 +277,5 @@ public class ConsolaMenu {
                     state, slope, forecast, accion.getPrioridad());
         }
         System.out.println("===============================================================================");
-    }
-
-    private int readIntOption(String prompt, int min, int max) {
-        while (true) {
-            System.out.print(prompt);
-            String input = this.scanner.nextLine().trim();
-            try {
-                int value = Integer.parseInt(input);
-                if (value >= min && value <= max) {
-                    return value;
-                }
-                System.out.printf(">> Ingrese un número entre %d y %d.%n", min, max);
-            } catch (NumberFormatException e) {
-                System.out.println(">> Entrada inválida. Ingrese un número entero.");
-            }
-        }
-    }
-
-    private double readDoubleOption(String prompt, double min, double max) {
-        while (true) {
-            System.out.print(prompt);
-            String input = this.scanner.nextLine().trim();
-            try {
-                double value = Double.parseDouble(input);
-                if (value >= min && value <= max) {
-                    return value;
-                }
-                System.out.printf(">> Ingrese un valor entre %.1f y %.1f.%n", min, max);
-            } catch (NumberFormatException e) {
-                System.out.println(">> Entrada inválida. Ingrese un número decimal válido.");
-            }
-        }
     }
 }
