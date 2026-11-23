@@ -1,5 +1,6 @@
 package interfaz;
 
+import java.io.Console;
 import java.util.Scanner;
 
 public class Validador {
@@ -64,6 +65,21 @@ public class Validador {
                 return texto;
             }
             System.out.println(">> Correo inválido. Ejemplo: usuario@correo.com");
+        }
+    }
+
+    public static String leerContrasenia(Scanner scanner, String mensaje) {
+        Console consola = System.console();
+        if (consola == null) {
+            System.out.println(">> Aviso: esta consola no permite ocultar la contraseña (ejecute desde la terminal para ocultarla).");
+            return leerTexto(scanner, mensaje);
+        }
+        while (true) {
+            char[] clave = consola.readPassword(mensaje);
+            if (clave != null && clave.length > 0) {
+                return new String(clave);
+            }
+            System.out.println(">> El campo no puede estar vacío.");
         }
     }
 

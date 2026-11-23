@@ -12,29 +12,38 @@ import negocio.CsvDatabase;
 public class ConsolaMenu {
 
     private final Scanner scanner;
-    private final CsvDatabase database;
-    private final Terreno terreno;
     private final Agronomo agronomo;
+    private CsvDatabase database;
+    private Terreno terreno;
 
-    public ConsolaMenu(Scanner scanner, CsvDatabase database, Terreno terreno, Agronomo agronomo) {
+    public ConsolaMenu(Scanner scanner, Agronomo agronomo) {
         this.scanner = scanner;
-        this.database = database;
-        this.terreno = terreno;
         this.agronomo = agronomo;
+        this.database = null;
+        this.terreno = null;
     }
 
     public void start() {
         printBanner();
 
-        if (!handleLogin()) {
-            return;
+        if (this.agronomo.getTerrenos().isEmpty()) {
+            System.out.println(">> Aún no tiene terrenos registrados. Registre su primer terreno (opción 7).");
+            System.out.println();
+        } else {
+            activarTerreno(this.agronomo.getTerrenos().get(0));
         }
 
         boolean running = true;
         while (running) {
             printMenuOptions();
-            int choice = Validador.leerEntero(this.scanner, "Seleccione una opción: ", 0, 6);
+            int choice = Validador.leerEntero(this.scanner, "Seleccione una opción: ", 0, 8);
             System.out.println();
+
+            if (choice >= 1 && choice <= 6 && this.terreno == null) {
+                System.out.println(">> Primero registre o seleccione un terreno (opciones 7 u 8).");
+                System.out.println();
+                continue;
+            }
 
             switch (choice) {
                 case 1:
@@ -55,9 +64,15 @@ public class ConsolaMenu {
                 case 6:
                     handleSummaryReport();
                     break;
+                case 7:
+                    handleRegisterTerrain();
+                    break;
+                case 8:
+                    handleSelectTerrain();
+                    break;
                 case 0:
                     running = false;
-                    System.out.println("Saliendo del Sistema de Monitoreo de Humedad. ¡Hasta pronto!");
+                    System.out.println(">> Sesión cerrada. Hasta pronto, " + this.agronomo.getNombre() + ".");
                     break;
                 default:
                     System.out.println("Opción inválida. Intente nuevamente.");
@@ -67,29 +82,56 @@ public class ConsolaMenu {
         }
     }
 
-    private boolean handleLogin() {
-        System.out.println("--- AUTENTICACIÓN DE AGRÓNOMO (RF11) ---");
-        System.out.println("Usuario registrado: " + this.agronomo.getNombre() + " (" + this.agronomo.getCorreo() + ")");
-
-        while (!this.agronomo.estaBloqueado()) {
-            String pass = Validador.leerTexto(this.scanner, "Ingrese contraseña: ");
-
-            if (this.agronomo.autenticar(pass)) {
-                System.out.println(">> Acceso concedido. Bienvenido, " + this.agronomo.getNombre() + "!");
-                System.out.println(">> " + this.agronomo.mostrarInformacion());
-                System.out.println(">> " + this.terreno.mostrarInformacion());
-                System.out.println();
-                return true;
-            } else {
-                int restantes = 3 - this.agronomo.getIntentosFallidos();
-                if (restantes > 0) {
-                    System.out.println(">> Contraseña incorrecta. Intentos restantes: " + restantes);
-                }
-            }
+    private void handleRegisterTerrain() {
+        System.out.println("--- REGISTRAR NUEVO TERRENO ---");
+        String codigo = Validador.leerTexto(this.scanner, "Código del terreno (ej. LOTE-01): ").toUpperCase();
+        if (this.agronomo.buscarTerreno(codigo) != null) {
+            System.out.println(">> Error: Ya tiene un terreno registrado con el código " + codigo + ".");
+            return;
         }
 
-        System.out.println(">> ERROR: Cuenta bloqueada temporalmente por 3 intentos fallidos.");
-        return false;
+        System.out.println("Tipos de suelo:");
+        System.out.println(" 1. Arenoso");
+        System.out.println(" 2. Arcilloso");
+        System.out.println(" 3. Humífero");
+        System.out.println(" 4. Rocoso");
+        int tipoSuelo = Validador.leerEntero(this.scanner, "Seleccione el tipo de suelo (1-4): ", 1, 4);
+        double area = Validador.leerDecimal(this.scanner, "Área en hectáreas (ej. 12.5): ", 0.1, 100000);
+
+        Terreno nuevo = new Terreno(codigo, tipoSuelo, area);
+        this.agronomo.agregarTerreno(nuevo);
+        activarTerreno(nuevo);
+        if (!this.database.cargarTerrenoDesdeCsv(nuevo)) {
+            System.out.println(">> No se encontró el archivo CSV del terreno. Se empezará sin lecturas.");
+        }
+        System.out.println(">> Terreno registrado correctamente y seleccionado como terreno de trabajo.");
+        System.out.println(">> " + nuevo.mostrarInformacion());
+    }
+
+    private void handleSelectTerrain() {
+        List<Terreno> terrenos = this.agronomo.getTerrenos();
+        if (terrenos.isEmpty()) {
+            System.out.println(">> No tiene terrenos registrados. Use la opción 7.");
+            return;
+        }
+
+        System.out.println("--- SUS TERRENOS ---");
+        for (Terreno t : terrenos) {
+            System.out.println(" - " + t.mostrarInformacion());
+        }
+        String codigo = Validador.leerTexto(this.scanner, "Ingrese el código del terreno: ").toUpperCase();
+        Terreno elegido = this.agronomo.buscarTerreno(codigo);
+        if (elegido == null) {
+            System.out.printf(">> No se encontró el terreno '%s'.%n", codigo);
+            return;
+        }
+        activarTerreno(elegido);
+        System.out.println(">> Terreno de trabajo: " + elegido.mostrarInformacion());
+    }
+
+    private void activarTerreno(Terreno t) {
+        this.terreno = t;
+        this.database = new CsvDatabase("data/readings_" + t.getCodigo() + ".csv");
     }
 
     private void printBanner() {
@@ -101,13 +143,18 @@ public class ConsolaMenu {
 
     private void printMenuOptions() {
         System.out.println("------------------------- MENÚ PRINCIPAL -------------------------");
-        System.out.println(" 1. Ver todas las lecturas registradas en el terreno (CSV)");
-        System.out.println(" 2. Registrar nueva lectura de sensor (y guardar en CSV)");
-        System.out.println(" 3. Editar/actualizar humedad de una lectura en CSV");
-        System.out.println(" 4. Eliminar una lectura del terreno y CSV");
-        System.out.println(" 5. Analizar un sensor (Estado, Tendencia, Predicción y Acción)");
+        System.out.println(" Usuario: " + this.agronomo.getNombre() + " | Terreno de trabajo: "
+                + (this.terreno == null ? "(ninguno)" : this.terreno.getCodigo()));
+        System.out.println("------------------------------------------------------------------");
+        System.out.println(" 1. Ver todas las lecturas del terreno");
+        System.out.println(" 2. Registrar nueva lectura de sensor");
+        System.out.println(" 3. Editar humedad de una lectura");
+        System.out.println(" 4. Eliminar una lectura");
+        System.out.println(" 5. Analizar un sensor");
         System.out.println(" 6. Mostrar reporte consolidado de todos los sensores");
-        System.out.println(" 0. Salir");
+        System.out.println(" 7. Registrar nuevo terreno");
+        System.out.println(" 8. Seleccionar terreno de trabajo");
+        System.out.println(" 0. Cerrar sesión");
         System.out.println("------------------------------------------------------------------");
     }
 
