@@ -1,12 +1,14 @@
 package interfaz;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import modelo.AccionAgronomica;
 import modelo.Agronomo;
 import modelo.Lectura;
 import modelo.Sensor;
 import modelo.Terreno;
+import negocio.ClienteEsp32;
 import negocio.CsvDatabase;
 
 public class ConsolaMenu {
@@ -15,12 +17,14 @@ public class ConsolaMenu {
     private final Agronomo agronomo;
     private CsvDatabase database;
     private Terreno terreno;
+    private ClienteEsp32 esp32;
 
     public ConsolaMenu(Scanner scanner, Agronomo agronomo) {
         this.scanner = scanner;
         this.agronomo = agronomo;
         this.database = null;
         this.terreno = null;
+        this.esp32 = null;
     }
 
     public void start() {
@@ -36,10 +40,10 @@ public class ConsolaMenu {
         boolean running = true;
         while (running) {
             printMenuOptions();
-            int choice = Validador.leerEntero(this.scanner, "Seleccione una opción: ", 0, 8);
+            int choice = Validador.leerEntero(this.scanner, "Seleccione una opción: ", 0, 10);
             System.out.println();
 
-            if (choice >= 1 && choice <= 6 && this.terreno == null) {
+            if (((choice >= 1 && choice <= 6) || choice == 9) && this.terreno == null) {
                 System.out.println(">> Primero registre o seleccione un terreno (opciones 7 u 8).");
                 System.out.println();
                 continue;
@@ -47,7 +51,9 @@ public class ConsolaMenu {
 
             switch (choice) {
                 case 1:
-                    handleListAllReadings();
+                    synchronized (this.terreno) {   // evita leer la lista mientras el ESP32 agrega
+                        handleListAllReadings();
+                    }
                     break;
                 case 2:
                     handleAddReading();
@@ -62,7 +68,9 @@ public class ConsolaMenu {
                     handleAnalyzeSensor();
                     break;
                 case 6:
-                    handleSummaryReport();
+                    synchronized (this.terreno) {
+                        handleSummaryReport();
+                    }
                     break;
                 case 7:
                     handleRegisterTerrain();
@@ -70,7 +78,17 @@ public class ConsolaMenu {
                 case 8:
                     handleSelectTerrain();
                     break;
+                case 9:
+                    handleConnectEsp32();
+                    break;
+                case 10:
+                    handleEsp32Status();
+                    break;
                 case 0:
+                    if (this.esp32 != null) {
+                        this.esp32.detener();
+                        this.esp32 = null;
+                    }
                     running = false;
                     System.out.println(">> Sesión cerrada. Hasta pronto, " + this.agronomo.getNombre() + ".");
                     break;
@@ -145,6 +163,7 @@ public class ConsolaMenu {
         System.out.println("------------------------- MENÚ PRINCIPAL -------------------------");
         System.out.println(" Usuario: " + this.agronomo.getNombre() + " | Terreno de trabajo: "
                 + (this.terreno == null ? "(ninguno)" : this.terreno.getCodigo()));
+        System.out.println(" Sensor ESP32: " + resumenEsp32());
         System.out.println("------------------------------------------------------------------");
         System.out.println(" 1. Ver todas las lecturas del terreno");
         System.out.println(" 2. Registrar nueva lectura de sensor");
@@ -154,6 +173,8 @@ public class ConsolaMenu {
         System.out.println(" 6. Mostrar reporte consolidado de todos los sensores");
         System.out.println(" 7. Registrar nuevo terreno");
         System.out.println(" 8. Seleccionar terreno de trabajo");
+        System.out.println(" 9. Conectar / desconectar sensor ESP32 (WiFi)");
+        System.out.println("10. Ver estado del sensor ESP32 (humedad en vivo)");
         System.out.println(" 0. Cerrar sesión");
         System.out.println("------------------------------------------------------------------");
     }
@@ -190,17 +211,23 @@ public class ConsolaMenu {
         double humidity = Validador.leerDecimal(this.scanner, "Ingrese Nivel de Humedad (%): ", 0.0, 100.0);
         String sensorId = Validador.leerTexto(this.scanner, "Ingrese ID del Sensor (ej. SEN-PALM-01): ").toUpperCase();
 
-        Sensor sensor = this.terreno.buscarSensor(sensorId);
-        if (sensor == null) {
-            sensor = new Sensor(sensorId, "Parcela-" + sensorId, 2.8, 1.2);
-            this.terreno.agregarSensor(sensor);
-        }
+        // synchronized: el ESP32 (opción 9) también escribe en este terreno desde otro hilo
+        synchronized (this.terreno) {
+            // Si el ESP32 guardó una lectura mientras se escribía, el ID se recalcula para no repetirlo
+            newId = this.database.generarSiguienteId(this.terreno);
 
-        Lectura nuevaLectura = new Lectura(newId, date, humidity);
-        if (sensor.registrarLectura(nuevaLectura) && this.database.guardarTerrenoEnCsv(this.terreno)) {
-            System.out.printf(">> Lectura %s agregada exitosamente al sensor %s y guardada en CSV!%n", newId, sensorId);
-        } else {
-            System.out.println(">> Error: No se pudo registrar la lectura en el archivo CSV.");
+            Sensor sensor = this.terreno.buscarSensor(sensorId);
+            if (sensor == null) {
+                sensor = new Sensor(sensorId, "Parcela-" + sensorId, 2.8, 1.2);
+                this.terreno.agregarSensor(sensor);
+            }
+
+            Lectura nuevaLectura = new Lectura(newId, date, humidity);
+            if (sensor.registrarLectura(nuevaLectura) && this.database.guardarTerrenoEnCsv(this.terreno)) {
+                System.out.printf(">> Lectura %s agregada exitosamente al sensor %s y guardada en CSV!%n", newId, sensorId);
+            } else {
+                System.out.println(">> Error: No se pudo registrar la lectura en el archivo CSV.");
+            }
         }
     }
 
@@ -224,11 +251,13 @@ public class ConsolaMenu {
         System.out.println("Registro actual: " + encontrada.mostrarInformacion());
         double newHumidity = Validador.leerDecimal(this.scanner, "Ingrese Nuevo Nivel de Humedad (%): ", 0.0, 100.0);
 
-        encontrada.setNivelHumedad(newHumidity);
-        if (this.database.guardarTerrenoEnCsv(this.terreno)) {
-            System.out.printf(">> Lectura %s actualizada a %.2f%% en el CSV!%n", id, newHumidity);
-        } else {
-            System.out.println(">> Error al actualizar el archivo CSV.");
+        synchronized (this.terreno) {
+            encontrada.setNivelHumedad(newHumidity);
+            if (this.database.guardarTerrenoEnCsv(this.terreno)) {
+                System.out.printf(">> Lectura %s actualizada a %.2f%% en el CSV!%n", id, newHumidity);
+            } else {
+                System.out.println(">> Error al actualizar el archivo CSV.");
+            }
         }
     }
 
@@ -236,18 +265,20 @@ public class ConsolaMenu {
         System.out.println("--- ELIMINAR LECTURA DEL TERRENO ---");
         String id = Validador.leerTexto(this.scanner, "Ingrese ID de Lectura a eliminar: ");
 
-        boolean eliminado = false;
-        for (Sensor s : this.terreno.getSensores()) {
-            if (s.eliminarLecturaPorId(id)) {
-                eliminado = true;
-                break;
+        synchronized (this.terreno) {
+            boolean eliminado = false;
+            for (Sensor s : this.terreno.getSensores()) {
+                if (s.eliminarLecturaPorId(id)) {
+                    eliminado = true;
+                    break;
+                }
             }
-        }
 
-        if (eliminado && this.database.guardarTerrenoEnCsv(this.terreno)) {
-            System.out.printf(">> Lectura %s eliminada exitosamente del CSV.%n", id);
-        } else {
-            System.out.printf(">> No se encontró la lectura '%s' o no se pudo eliminar.%n", id);
+            if (eliminado && this.database.guardarTerrenoEnCsv(this.terreno)) {
+                System.out.printf(">> Lectura %s eliminada exitosamente del CSV.%n", id);
+            } else {
+                System.out.printf(">> No se encontró la lectura '%s' o no se pudo eliminar.%n", id);
+            }
         }
     }
 
@@ -266,6 +297,12 @@ public class ConsolaMenu {
 
         String sensorId = Validador.leerTexto(this.scanner, "Ingrese ID del Sensor a analizar: ").toUpperCase();
 
+        synchronized (this.terreno) {
+            imprimirAnalisisSensor(sensorId);
+        }
+    }
+
+    private void imprimirAnalisisSensor(String sensorId) {
         Sensor sensor = this.terreno.buscarSensor(sensorId);
         if (sensor == null || sensor.getUltimaLectura() == null) {
             System.out.printf(">> No existen lecturas para el sensor '%s'.%n", sensorId);
@@ -324,5 +361,114 @@ public class ConsolaMenu {
                     state, slope, forecast, accion.getPrioridad());
         }
         System.out.println("===============================================================================");
+    }
+
+    // ======================= SENSOR ESP32 (WiFi / HTTP) =======================
+
+    private void handleConnectEsp32() {
+        if (this.esp32 != null) {
+            System.out.println("--- DESCONECTAR SENSOR ESP32 ---");
+            this.esp32.detener();
+            System.out.printf(">> Sensor ESP32 desconectado. Se guardaron %d lecturas en esta sesión.%n",
+                    this.esp32.getTotalGuardadas());
+            this.esp32 = null;
+            return;
+        }
+
+        System.out.println("--- CONECTAR SENSOR ESP32 (WiFi) ---");
+        System.out.println("La laptop y el ESP32 deben estar conectados al mismo hotspot.");
+        String host = leerOpcional("Dirección del ESP32 [Enter = " + ClienteEsp32.HOST_POR_DEFECTO + "]: ",
+                ClienteEsp32.HOST_POR_DEFECTO);
+        String minutosTxt = leerOpcional("Minutos entre lecturas guardadas en el CSV [Enter = "
+                + ClienteEsp32.MINUTOS_POR_DEFECTO + "]: ", String.valueOf(ClienteEsp32.MINUTOS_POR_DEFECTO));
+        int minutos;
+        try {
+            minutos = Integer.parseInt(minutosTxt);
+        } catch (NumberFormatException e) {
+            minutos = -1;
+        }
+        if (minutos < 1 || minutos > 1440) {
+            System.out.println(">> Ingrese un número de minutos entre 1 y 1440.");
+            return;
+        }
+
+        ClienteEsp32 cliente = new ClienteEsp32(host, this.terreno, this.database, minutos);
+        System.out.println("Conectando con " + cliente.getUrl() + " ...");
+        Map<String, String> datos;
+        try {
+            datos = cliente.probarConexion();
+        } catch (Exception e) {
+            System.out.println(">> No se pudo conectar con el ESP32: " + e.getMessage());
+            System.out.println(">> Revise que el ESP32 esté encendido y que la laptop esté en el mismo hotspot.");
+            System.out.println(">> Si el nombre no funciona, use la IP que muestra el monitor serial del ESP32.");
+            return;
+        }
+
+        String terrenoEsp = datos.getOrDefault("terreno", "");
+        if (!terrenoEsp.isEmpty() && !terrenoEsp.equalsIgnoreCase(this.terreno.getCodigo())) {
+            System.out.printf(">> Aviso: el ESP32 está configurado para el terreno %s, pero se guardará en %s.%n",
+                    terrenoEsp, this.terreno.getCodigo());
+        }
+
+        cliente.iniciar();
+        this.esp32 = cliente;
+        System.out.printf(">> Conectado al sensor %s | Humedad actual: %s%% (%s)%n",
+                datos.get("sensor"), datos.get("humedad"), datos.get("estado"));
+        System.out.printf(">> Se guardará 1 lectura promediada cada %d min en data/readings_%s.csv%n",
+                minutos, this.terreno.getCodigo());
+        System.out.println(">> Puede seguir usando el menú; la lectura continúa en segundo plano (ver opción 10).");
+    }
+
+    private void handleEsp32Status() {
+        if (this.esp32 == null) {
+            System.out.println(">> No hay un sensor ESP32 conectado. Use la opción 9.");
+            return;
+        }
+        ClienteEsp32 c = this.esp32;
+        Map<String, String> d = c.getUltimaLectura();
+
+        System.out.println("===================== ESTADO DEL SENSOR ESP32 =====================");
+        System.out.printf(" Dirección:            %s%n", c.getUrl());
+        System.out.printf(" Conexión:             %s%n", c.isConectado() ? "CONECTADO" : "SIN RESPUESTA");
+        if (c.getUltimoError() != null) {
+            System.out.printf(" Último error:         %s%n", c.getUltimoError());
+        }
+        System.out.printf(" Terreno destino:      %s%n", c.getTerreno().getCodigo());
+        if (d != null) {
+            System.out.printf(" Sensor:               %s%n", d.get("sensor"));
+            System.out.printf(" Humedad en vivo:      %s%% (%s) hace %d s%n",
+                    d.get("humedad"), d.get("estado"), c.getSegundosDesdeUltimaLectura());
+            System.out.printf(" Voltaje:              %s mV (rango ventana %s-%s mV)%n",
+                    d.get("mv"), d.get("mv_min"), d.get("mv_max"));
+            System.out.printf(" Calibración:          seco %s mV / mojado %s mV%n",
+                    d.get("seco_mv"), d.get("mojado_mv"));
+        }
+        System.out.println("-------------------------------------------------------------------");
+        long seg = c.getSegundosParaGuardar();
+        System.out.printf(" Lecturas acumuladas:  %d (guardado cada %d min)%n",
+                c.getLecturasAcumuladas(), c.getMinutosEntreGuardados());
+        System.out.printf(" Próximo guardado:     %s%n", seg < 0 ? "esperando lecturas" : "en " + seg + " s");
+        System.out.printf(" Guardadas en CSV:     %d%n", c.getTotalGuardadas());
+        if (c.getUltimoGuardado() != null) {
+            System.out.printf(" Último guardado:      %s%n", c.getUltimoGuardado());
+        }
+        System.out.println("===================================================================");
+    }
+
+    private String resumenEsp32() {
+        if (this.esp32 == null) {
+            return "desconectado (opción 9)";
+        }
+        Map<String, String> d = this.esp32.getUltimaLectura();
+        if (!this.esp32.isConectado() || d == null) {
+            return "SIN RESPUESTA (ver opción 10)";
+        }
+        return String.format("%s | %s%% | %s", d.get("sensor"), d.get("humedad"), d.get("estado"));
+    }
+
+    private String leerOpcional(String mensaje, String porDefecto) {
+        System.out.print(mensaje);
+        String texto = this.scanner.nextLine().trim();
+        return texto.isEmpty() ? porDefecto : texto;
     }
 }
